@@ -2,6 +2,7 @@
 ### Test Environment
 ### Ubuntu 18.04, ROS Melodic, Opencv 3.4.16
 <pre>
+<code>git clone git@github.com:mkyun2/ROS_SORT.git</code>
 <code>catkin_make
 rosrun sort_ros sort_ros_node</code>
 </pre>
@@ -10,8 +11,5 @@ rosrun sort_ros sort_ros_node</code>
 ### https://github.com/mcximing/
 ### https://github.com/engcang/
 
-<pre>
-<code>git clone git@github.com:mkyun2/ROS_SORT.git</code>
-</pre>
 
 
