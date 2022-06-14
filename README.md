@@ -4,7 +4,7 @@
 <pre>
 <code>git clone git@github.com:mkyun2/ROS_SORT.git</code>
 </pre>
-### Should be executing YOLO-ROS before executing SORT
+#### Should be executing YOLO-ROS before executing SORT
 <pre>
 <code>catkin_make
 rosrun sort_ros sort_ros_node</code>
