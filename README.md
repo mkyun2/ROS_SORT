@@ -8,6 +8,12 @@
 
 <pre>
 <code>
-git clone 
+git clone git@github.com:mkyun2/ROS_SORT.git
 </code>
+</pre>
+
+<pre>
+<code>
+catkin_make
+rosrun sort_ros sort_ros_node</code>
 </pre>
