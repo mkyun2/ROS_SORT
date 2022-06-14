@@ -53,6 +53,7 @@ double GetIOU(Rect_<float> bb_test, Rect_<float> bb_gt)
 // global variables for counting
 #define CNUM 20
 darknet_ros_msgs::BoundingBoxes tracked_bboxes;
+
 vector<TrackingBox> detData;
 int maxFrame = 1;
 // 0. randomly generate colors, only for display
@@ -69,6 +70,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 	//ROS_INFO("current0");
     darknet_ros_msgs::BoundingBoxes bboxes;
     bboxes.bounding_boxes = msg->bounding_boxes;
+	
 	//ROS_INFO("current0");
     // 1. read bounding boxes from object detector, here from YOLO v3 ROS version.
     ROS_INFO("%d",bboxes.bounding_boxes.size());
@@ -80,6 +82,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 		
         tb.box = Rect_<float>(Point_<float>(float(bboxes.bounding_boxes[i].xmin), float(bboxes.bounding_boxes[i].ymin)), Point_<float>(float(bboxes.bounding_boxes[i].xmax), float(bboxes.bounding_boxes[i].ymax)));
 		detData.push_back(tb);
+		cout << tb.box.x << endl;
     }
 
 	// 2. group detData by frame
@@ -245,6 +248,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 			trkIdx = matchedPairs[i].x;
 			detIdx = matchedPairs[i].y;
 			trackers[trkIdx].update(detFrameData[fi][detIdx].box);
+			trackers[trkIdx].m_id = trkIdx;
 			ROS_INFO("trkidx id %d",trkIdx);
 			ROS_INFO("detidx id %d",detIdx);
 		}
@@ -289,12 +293,19 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 			if (((*it).m_time_since_update < 1) &&
 				((*it).m_hit_streak >= min_hits || frame_count <= min_hits))
 			{
+				darknet_ros_msgs::BoundingBox boundingBox;
 				TrackingBox res;
 				res.box = (*it).get_state();
 				res.id = (*it).m_id + 1;
 				res.frame = frame_count;
 				frameTrackingResult.push_back(res);
 				
+				 boundingBox.id = (*it).m_id;
+				 boundingBox.xmin = res.box.x;
+				 boundingBox.ymin = res.box.y;
+				 boundingBox.xmax = res.box.x + res.box.width;
+				 boundingBox.ymax = res.box.y + res.box.height;
+				 tracked_bboxes.bounding_boxes.push_back(boundingBox);
 				it++;
 				
 			}
@@ -306,6 +317,16 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				it = trackers.erase(it);
 				ROS_INFO("m_time: %d ERASE",(*it).m_time_since_update);
 			}
+			// for (auto it = trackers.begin(); it != trackers.end();)
+			// {
+			// 	darknet_ros_msgs::BoundingBox boundingBox;
+			// 	boundingBox.id = (*it).m_id;
+			// 	boundingBox.xmin = (*it).get_state().x;
+			// 	boundingBox.ymin = (*it).get_state().y;
+			// 	boundingBox.xmax = (*it).get_state().x + (*it).get_state().width;
+			// 	boundingBox.ymax = (*it).get_state().y + (*it).get_state().height;
+			// 	tracked_bboxes.bounding_boxes.push_back(boundingBox);
+			// }
 			//ROS_INFO("tb id ");
 //		    if (display) // read image, draw results and show them
 //		    {
@@ -313,7 +334,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 //		    }
 			
 		}
-//        result_boxes.publish(box);
+        
 
 		cycle_time = (double)(getTickCount() - start_time);
         double fps = (1.0/cycle_time)*getTickFrequency();
@@ -337,6 +358,8 @@ int main(int argc, char **argv)
     while (ros::ok())
     {
 		//ROS_INFO("current3");
+		result_boxes.publish(tracked_bboxes);
+		tracked_bboxes.bounding_boxes.clear();
         ros::spinOnce();
         loop_rate.sleep();
     }
