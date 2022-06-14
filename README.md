@@ -9,5 +9,5 @@
 <pre>
 <code>
 git clone 
-</pre>
 </code>
+</pre>
