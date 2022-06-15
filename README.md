@@ -9,9 +9,10 @@
 <code>catkin_make
 rosrun sort_ros sort_ros_node</code>
 </pre>
-https://github.com/mkyun2/ROS_SORT/blob/main/picture/0.png
-https://github.com/mkyun2/ROS_SORT/blob/main/picture/1.png
-https://github.com/mkyun2/ROS_SORT/blob/main/picture/2.png
+
+<img src="/picture/0.png" width = "50%" height = "50%"></img>
+<img src="/picture/1.png" width = "50%" height = "50%"></img>
+<img src="/picture/2.png" width = "50%" height = "50%"></img>
 
 ## I refer to below
 ### https://github.com/abewley/sort
