@@ -9,10 +9,9 @@
 <code>catkin_make
 rosrun sort_ros sort_ros_node</code>
 </pre>
-
-<video width="100%" height="100%" controls="controls">
-  <source src="/Video/TestVideo.mp4" type="video/mp4">
-</video>
+https://github.com/mkyun2/ROS_SORT/blob/main/picture/0.png
+https://github.com/mkyun2/ROS_SORT/blob/main/picture/1.png
+https://github.com/mkyun2/ROS_SORT/blob/main/picture/2.png
 
 ## I refer to below
 ### https://github.com/abewley/sort
