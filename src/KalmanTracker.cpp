@@ -4,7 +4,7 @@
 #include "KalmanTracker.h"
 #include <cmath>
 
-int KalmanTracker::kf_count = 0;
+//int KalmanTracker::kf_count = 0;
 
 
 // initialize Kalman filter

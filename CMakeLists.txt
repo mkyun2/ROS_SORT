@@ -8,6 +8,10 @@ find_package(catkin REQUIRED
   COMPONENTS
     roscpp
     darknet_ros_msgs
+    std_msgs
+    image_transport
+    cv_bridge
+    sensor_msgs
 )
 find_package(OpenCV REQUIRED)
 if(NOT OpenCV_FOUND)

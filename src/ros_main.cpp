@@ -20,14 +20,17 @@
 #include <iostream>
 #include <iomanip> // to format image names using setw() and setfill()
 #include <unistd.h>
-
+#include <string>
 #include <set>
 
 #include "Hungarian.h"
 #include "KalmanTracker.h"
-
+#include <opencv2/opencv.hpp>
+#include <image_transport/image_transport.h>
+#include <opencv2/highgui/highgui.hpp>
+#include <cv_bridge/cv_bridge.h>
 #include "opencv2/video/tracking.hpp"
-
+#include <std_msgs/UInt8MultiArray.h>
 using namespace std;
 using namespace cv;
 
@@ -49,17 +52,19 @@ double GetIOU(Rect_<float> bb_test, Rect_<float> bb_gt)
 
 	return (double)(in / un);
 }
-
+bool display = false;
 // global variables for counting
 #define CNUM 20
 darknet_ros_msgs::BoundingBoxes tracked_bboxes;
-
+cv::Mat frame;
 vector<TrackingBox> detData;
 int maxFrame = 1;
 // 0. randomly generate colors, only for display
 RNG rng(0xFFFFFFFF);
 Scalar_<int> randColor[CNUM];
 vector<KalmanTracker> trackers;
+int KalmanTracker::kf_count = 0; // tracking id relies on this, so we have to reset it in each seq.
+
 void setup(){
     for (int i = 0; i < CNUM; i++)
 	    rng.fill(randColor[i], RNG::UNIFORM, 0, 256);
@@ -112,7 +117,8 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 
 	double cycle_time = 0.0;
 	int64 start_time = 0;
-
+	set<int> manageId;
+		
 	//////////////////////////////////////////////
 	// main loop
 	for (int fi = 0; fi < maxFrame; fi++)
@@ -128,8 +134,12 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 			// initialize kalman trackers using first detections.
 			for (unsigned int i = 0; i < detFrameData[fi].size(); i++)
 			{
+				
+				manageId.insert(KalmanTracker::kf_count);
 				KalmanTracker trk = KalmanTracker(detFrameData[fi][i].box);
+				ROS_INFO("m_id %d",trk.m_id);
 				//ROS_INFO("detframedata: %d",detFrameData[fi].size());
+				
 				trackers.push_back(trk);
 			}
 			// output the first frame detections
@@ -150,6 +160,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 
 		for (auto it = trackers.begin(); it != trackers.end();)
 		{
+			//KalmanTracker::kf_count++;
 			Rect_<float> pBox = (*it).predict();
 			if (pBox.x >= 0 && pBox.y >= 0)
 			{
@@ -160,8 +171,9 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 			else
 			{
 				//ROS_INFO("tb id 2");
+				//manageId.erase((*it).m_id);
 				it = trackers.erase(it);
-				//cerr << "Box invalid at frame: " << frame_count << endl;
+				//cerrdetFrameData
 			}
 		}
 
@@ -212,8 +224,13 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 		{
 			for (unsigned int i = 0; i < trkNum; ++i)
 				if (assignment[i] == -1) // unassigned label will be set as -1 in the assignment algorithm
-					{unmatchedTrajectories.insert(i);
-					ROS_INFO("UNMATCHED insert");
+					{
+						manageId.insert(trackers[i].m_id);
+						
+						unmatchedTrajectories.insert(i);
+						ROS_INFO("-------------------------");
+						ROS_INFO("UNMATCHED insert , %d",i);
+						ROS_INFO("UNMATCHED ID** , %d",trackers[i].m_id);
 					}
 					
 		}
@@ -241,6 +258,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 		// update matched trackers with assigned detections.
 		// each prediction is corresponding to a tracker
 		int detIdx, trkIdx;
+		//set<int> manageId;
 		
 		for (unsigned int i = 0; i < matchedPairs.size(); i++)
 		{
@@ -248,19 +266,49 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 			trkIdx = matchedPairs[i].x;
 			detIdx = matchedPairs[i].y;
 			trackers[trkIdx].update(detFrameData[fi][detIdx].box);
-			trackers[trkIdx].m_id = trkIdx;
+			//trackers[trkIdx].m_id = trkIdx;
 			ROS_INFO("trkidx id %d",trkIdx);
 			ROS_INFO("detidx id %d",detIdx);
+			ROS_INFO("Matched m_id %d --",trackers[trkIdx].m_id);
+			manageId.insert(trackers[trkIdx].m_id);
+			// if((KalmanTracker::kf_count) == trackers[trkIdx].m_id)
+			// {
+			// 	ROS_INFO("kfcount:%d",KalmanTracker::kf_count);
+			// 	KalmanTracker::kf_count++;
+			// }
 		}
+		
 		
 		// create and initialise new trackers for unmatched detections
 		
 		for (auto umd : unmatchedDetections)
 		{
+			
+			while(1)
+			{
+				set<int>::iterator Iter = manageId.find(KalmanTracker::kf_count);
+				if(Iter != manageId.end())
+				{
+					ROS_INFO("find %d, %d",KalmanTracker::kf_count,(*Iter));
+					KalmanTracker::kf_count++;
+				}
+				else
+				{
+					ROS_INFO("not find %d, %d",KalmanTracker::kf_count,manageId.end());
+					break;
+				}
+			}
+
+			manageId.insert(KalmanTracker::kf_count);
 			KalmanTracker tracker = KalmanTracker(detFrameData[fi][umd].box);
+			ROS_INFO("UM m_id %d **",tracker.m_id);
+			
 			trackers.push_back(tracker);
-			ROS_INFO("UNDET..");
+			
+			ROS_INFO("Add New Detection");
+			
 		}
+		
 		ROS_INFO("UMT : %d",unmatchedTrajectories.size());
 		// for (auto umt : unmatchedTrajectories)
 		// {
@@ -269,6 +317,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 		// 	for (auto it = trackers.begin(); it!=trackers.end();)
 		// 	{
 		// 		ROS_INFO("UNMATECHING..2");
+		
 		// 		if((*it).m_id== tracker.m_id){
 		// 			(*it).m_time_since_update++;
 		// 			ROS_INFO("ERASE");
@@ -283,9 +332,10 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 		// 	// 	(*it).m_time_since_update++;
 		// 	//trackers.erase(tracker);
 		// }
+		
+		// get trackers' output
 		detData.clear();
 		detFrameData.clear();
-		// get trackers' output
 		frameTrackingResult.clear();
 		for (auto it = trackers.begin(); it != trackers.end();)
 		{
@@ -298,9 +348,15 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				res.box = (*it).get_state();
 				res.id = (*it).m_id + 1;
 				res.frame = frame_count;
+				if(display){
+				cv::rectangle(frame, res.box, randColor[res.id % CNUM], 2, 8, 0);
+				cv::putText(frame,std::to_string(res.id),Point_<int>(int(res.box.x),int(res.box.y)),cv::FONT_ITALIC,1,randColor[res.id % CNUM],2);
+				cv::imshow("view", frame);
+				cv::waitKey(1);
+				}
 				frameTrackingResult.push_back(res);
 				
-				 boundingBox.id = (*it).m_id;
+				 boundingBox.id = res.id;
 				 boundingBox.xmin = res.box.x;
 				 boundingBox.ymin = res.box.y;
 				 boundingBox.xmax = res.box.x + res.box.width;
@@ -313,9 +369,12 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				it++;
 			// remove dead tracklet
 			//ROS_INFO("time %d",(*it).m_time_since_update);
-			if (it != trackers.end() && (*it).m_time_since_update > max_age){
-				it = trackers.erase(it);
+			if (it != trackers.end() && (*it).m_time_since_update > max_age)
+			{
+				manageId.erase((*it).m_id); // filter id remove
 				ROS_INFO("m_time: %d ERASE",(*it).m_time_since_update);
+				it = trackers.erase(it);
+				
 			}
 			// for (auto it = trackers.begin(); it != trackers.end();)
 			// {
@@ -334,7 +393,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 //		    }
 			
 		}
-        
+		
 
 		cycle_time = (double)(getTickCount() - start_time);
         double fps = (1.0/cycle_time)*getTickFrequency();
@@ -342,17 +401,34 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
         ROS_INFO("current : %.1f", fps);
 	}
 	//ROS_INFO("current2");
+	
 }
 
 
 
+void imgCall(const sensor_msgs::ImageConstPtr& msg)
+{
+	try
+  {
+    // Decode image in msg
+    frame = cv_bridge::toCvShare(msg, "bgr8")->image;
+    display = true;
+  }
+  catch (cv_bridge::Exception& e)
+  {
+    ROS_ERROR("cannot decode image");
+  }
+}
 
 int main(int argc, char **argv)
 {
     setup();
     ros::init(argc, argv, "SORT");
     ros::NodeHandle n;
+	cv::namedWindow("view");
+  	cv::startWindowThread();
     ros::Subscriber sub = n.subscribe("/darknet_ros/bounding_boxes", 1000, &SORT);
+	ros::Subscriber img_sub = n.subscribe("/usb_cam/image_raw", 1, &imgCall);
     ros::Publisher result_boxes = n.advertise<darknet_ros_msgs::BoundingBoxes>("tracked_boxes",1000);
     ros::Rate loop_rate(50);
     while (ros::ok())
@@ -363,4 +439,5 @@ int main(int argc, char **argv)
         ros::spinOnce();
         loop_rate.sleep();
     }
+	cv::destroyWindow("view");
 }
