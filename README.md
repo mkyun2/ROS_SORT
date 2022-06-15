@@ -9,8 +9,10 @@
 <code>catkin_make
 rosrun sort_ros sort_ros_node</code>
 </pre>
-<iframe id="video" width="640" height="320" src="/Video/Testvideo.mp4" frameborder="0">
-</iframe>
+
+<video width="100%" height="100%" controls="controls">
+  <source src="/Video/TestVideo.mp4" type="video/mp4">
+</video>
 
 ## I refer to below
 ### https://github.com/abewley/sort
