@@ -9,7 +9,8 @@
 <code>catkin_make
 rosrun sort_ros sort_ros_node</code>
 </pre>
-## Working Image Blue:Prediction Green: Measurement Red:Correction
+## Working Image
+### Blue:Prediction Green: Measurement Red:Correction
 <img src="/picture/test1.png" width = "50%" height = "50%"></img>
 <img src="/picture/test2.png" width = "50%" height = "50%"></img>
 <img src="/picture/test3.png" width = "50%" height = "50%"></img>
