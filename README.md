@@ -7,7 +7,7 @@
   #### Should be executing YOLO-ROS before executing SORT
 <pre>
 <code>catkin_make
-rosrun sort_ros sort_ros_node</code>
+rosrun ros_sort ros_sort_node</code>
 </pre>
 ## Working Image
 ### Blue:Prediction Green: Measurement Red:Correction
