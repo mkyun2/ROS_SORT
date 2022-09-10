@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(sort_ros)
+project(ros_sort)
 
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")

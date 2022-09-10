@@ -31,6 +31,9 @@
 #include <cv_bridge/cv_bridge.h>
 #include "opencv2/video/tracking.hpp"
 #include <std_msgs/UInt8MultiArray.h>
+
+#define StateType Rect_<float>
+
 using namespace std;
 using namespace cv;
 
@@ -55,8 +58,13 @@ double GetIOU(Rect_<float> bb_test, Rect_<float> bb_gt)
 bool display = false;
 // global variables for counting
 #define CNUM 20
+//darknet_ros_msgs::BoundingBox predBox;
+//darknet_ros_msgs::BoundingBox detectBox;
 darknet_ros_msgs::BoundingBoxes tracked_bboxes;
+darknet_ros_msgs::BoundingBoxes detected_bboxes;
+darknet_ros_msgs::BoundingBoxes predicted_bboxes;
 cv::Mat frame;
+cv::Mat frame2;
 vector<TrackingBox> detData;
 int maxFrame = 1;
 // 0. randomly generate colors, only for display
@@ -69,13 +77,26 @@ void setup(){
     for (int i = 0; i < CNUM; i++)
 	    rng.fill(randColor[i], RNG::UNIFORM, 0, 256);
 }
+// get_rect(float cx, float cy, float s, float r)
+// {
+// 	float w = sqrt(s * r);
+// 	float h = s / w;
+// 	float x = (cx - w / 2);
+// 	float y = (cy - h / 2);
 
+// 	if (x < 0 && cx > 0)
+// 		x = 0;
+// 	if (y < 0 && cy > 0)
+// 		y = 0;
+
+// 	return StateType(x, y, w, h);
+// }
 void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 {
 	//ROS_INFO("current0");
     darknet_ros_msgs::BoundingBoxes bboxes;
     bboxes.bounding_boxes = msg->bounding_boxes;
-	
+	//detected_bboxes = bboxes.bounding_boxes
 	//ROS_INFO("current0");
     // 1. read bounding boxes from object detector, here from YOLO v3 ROS version.
     ROS_INFO("%d",bboxes.bounding_boxes.size());
@@ -86,8 +107,9 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
         tb.id = bboxes.bounding_boxes[i].id;
 		
         tb.box = Rect_<float>(Point_<float>(float(bboxes.bounding_boxes[i].xmin), float(bboxes.bounding_boxes[i].ymin)), Point_<float>(float(bboxes.bounding_boxes[i].xmax), float(bboxes.bounding_boxes[i].ymax)));
+		cv::rectangle(frame, tb.box, Scalar_<int>(0,255,0), 2, 8, 0);
 		detData.push_back(tb);
-		cout << tb.box.x << endl;
+		//cout << tb.box.x << endl;
     }
 
 	// 2. group detData by frame
@@ -146,6 +168,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 			for (unsigned int id = 0; id < detFrameData[fi].size(); id++)
 			{
 				TrackingBox tb = detFrameData[fi][id];
+				//cv::rectangle(frame, tb.box, Scalar_<int>(0,255,0), 2, 8, 0);
 				//ROS_INFO("tb id %d ", tb.id);
 			}
 			
@@ -157,14 +180,22 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 		///////////////////////////////////////
 		// 3.1. get predicted locations from existing trackers.
 		predictedBoxes.clear(); 
-
+		darknet_ros_msgs::BoundingBox predBox;
 		for (auto it = trackers.begin(); it != trackers.end();)
 		{
 			//KalmanTracker::kf_count++;
 			Rect_<float> pBox = (*it).predict();
 			if (pBox.x >= 0 && pBox.y >= 0)
 			{
+				// boundingBox.id = ;
+				// boundingBox.xmin = res.box.x;
+				// boundingBox.ymin = res.box.y;
+				// boundingBox.xmax = res.box.x + res.box.width;
+				// boundingBox.ymax = res.box.y + res.box.height;
+				// tracked_bboxes.bounding_boxes.push_back(boundingBox);
+				cv::rectangle(frame, pBox,  Scalar_<int>(255,0,0), 2, 8, 0);
 				predictedBoxes.push_back(pBox);
+				
 				//ROS_INFO("tb id ");
 				it++;
 			}
@@ -229,7 +260,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 						
 						unmatchedTrajectories.insert(i);
 						ROS_INFO("-------------------------");
-						ROS_INFO("UNMATCHED insert , %d",i);
+						ROS_INFO("UNMATCHED tracker , %d",i);
 						ROS_INFO("UNMATCHED ID** , %d",trackers[i].m_id);
 					}
 					
@@ -294,7 +325,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				}
 				else
 				{
-					ROS_INFO("not find %d, %d",KalmanTracker::kf_count,manageId.end());
+					ROS_INFO("not find %d, %d",KalmanTracker::kf_count,(*Iter));
 					break;
 				}
 			}
@@ -309,29 +340,20 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 			
 		}
 		
-		ROS_INFO("UMT : %d",unmatchedTrajectories.size());
-		// for (auto umt : unmatchedTrajectories)
-		// {
-		// 	ROS_INFO("UNMATCHING..");
-		// 	KalmanTracker tracker = KalmanTracker(detFrameData[fi][umt].box);
-		// 	for (auto it = trackers.begin(); it!=trackers.end();)
-		// 	{
-		// 		ROS_INFO("UNMATECHING..2");
-		
-		// 		if((*it).m_id== tracker.m_id){
-		// 			(*it).m_time_since_update++;
-		// 			ROS_INFO("ERASE");
-		// 		}
-		// 		else{
-		// 			++it;
-		// 		}
-		// 	}
-		// 	// auto it = find(trackers.begin(),trackers.end(),tracker);
-		// 	// trackers.erase()
-		// 	// if(it != trackers.end())
-		// 	// 	(*it).m_time_since_update++;
-		// 	//trackers.erase(tracker);
-		// }
+		ROS_INFO("Display %d UMT : %d",display,unmatchedTrajectories.size());
+		//Delete unmatchedTrajectories 
+		for (auto it = trackers.begin(); it!=trackers.end();)
+		{
+
+				if(it != trackers.end() && (*it).m_time_since_update > max_age)
+				{
+				manageId.erase((*it).m_id);
+				trackers.erase(it);
+				it--;
+				ROS_INFO("ERASE");
+				}
+				it++;
+		}
 		
 		// get trackers' output
 		detData.clear();
@@ -349,7 +371,8 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				res.id = (*it).m_id + 1;
 				res.frame = frame_count;
 				if(display){
-				cv::rectangle(frame, res.box, randColor[res.id % CNUM], 2, 8, 0);
+				//cv::rectangle(frame, res.box, randColor[res.id % CNUM], 2, 8, 0);
+				cv::rectangle(frame, res.box, Scalar_<int>(0,0,255), 2, 8, 0);
 				cv::putText(frame,std::to_string(res.id),Point_<int>(int(res.box.x),int(res.box.y)),cv::FONT_ITALIC,1,randColor[res.id % CNUM],2);
 				cv::imshow("view", frame);
 				cv::waitKey(1);
@@ -369,13 +392,13 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				it++;
 			// remove dead tracklet
 			//ROS_INFO("time %d",(*it).m_time_since_update);
-			if (it != trackers.end() && (*it).m_time_since_update > max_age)
-			{
-				manageId.erase((*it).m_id); // filter id remove
-				ROS_INFO("m_time: %d ERASE",(*it).m_time_since_update);
-				it = trackers.erase(it);
+			//if (it != trackers.end() && (*it).m_time_since_update > max_age)
+			//{
+			//	manageId.erase((*it).m_id); // filter id remove
+			//	ROS_INFO("m_time: %d ERASE",(*it).m_time_since_update);
+			//	it = trackers.erase(it);
 				
-			}
+			//}
 			// for (auto it = trackers.begin(); it != trackers.end();)
 			// {
 			// 	darknet_ros_msgs::BoundingBox boundingBox;
@@ -427,10 +450,10 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
 	cv::namedWindow("view");
   	cv::startWindowThread();
-    ros::Subscriber sub = n.subscribe("/darknet_ros/bounding_boxes", 1000, &SORT);
-	ros::Subscriber img_sub = n.subscribe("/usb_cam/image_raw", 1, &imgCall);
-    ros::Publisher result_boxes = n.advertise<darknet_ros_msgs::BoundingBoxes>("tracked_boxes",1000);
-    ros::Rate loop_rate(50);
+    ros::Subscriber sub = n.subscribe("/darknet_ros/bounding_boxes", 50, &SORT);
+	ros::Subscriber img_sub = n.subscribe("/zed2/zed_node/left_raw/image_raw_color", 1, &imgCall);
+    ros::Publisher result_boxes = n.advertise<darknet_ros_msgs::BoundingBoxes>("tracked_boxes",50);
+    ros::Rate loop_rate(30);
     while (ros::ok())
     {
 		//ROS_INFO("current3");

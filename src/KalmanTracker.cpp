@@ -14,22 +14,22 @@ void KalmanTracker::init_kf(StateType stateMat)
 	int measureNum = 4;
 	kf = KalmanFilter(stateNum, measureNum, 0);
 
-	measurement = Mat::zeros(measureNum, 1, CV_32F);
+	 measurement = Mat::zeros(measureNum, 1, CV_32F);
 
 //	kf.transitionMatrix = *(Mat_<float>(stateNum, stateNum) <<
-	kf.transitionMatrix = (Mat_<float>(stateNum, stateNum) <<
-		1, 0, 0, 0, 1, 0, 0,
-		0, 1, 0, 0, 0, 1, 0,
-		0, 0, 1, 0, 0, 0, 1,
-		0, 0, 0, 1, 0, 0, 0,
-		0, 0, 0, 0, 1, 0, 0,
-		0, 0, 0, 0, 0, 1, 0,
-		0, 0, 0, 0, 0, 0, 1);
+	 kf.transitionMatrix = (Mat_<float>(stateNum, stateNum) <<
+	 	1, 0, 0, 0, 1, 0, 0,
+	 	0, 1, 0, 0, 0, 1, 0,
+	 	0, 0, 1, 0, 0, 0, 1,
+	 	0, 0, 0, 1, 0, 0, 0,
+	 	0, 0, 0, 0, 1, 0, 0,
+	 	0, 0, 0, 0, 0, 1, 0,
+	 	0, 0, 0, 0, 0, 0, 1);
 
-	setIdentity(kf.measurementMatrix);
-	setIdentity(kf.processNoiseCov, Scalar::all(1e-2));
-	setIdentity(kf.measurementNoiseCov, Scalar::all(1e-1));
-	setIdentity(kf.errorCovPost, Scalar::all(1));
+	 setIdentity(kf.measurementMatrix);
+	 setIdentity(kf.processNoiseCov, Scalar::all(1e-2));
+	 setIdentity(kf.measurementNoiseCov, Scalar::all(1e-1));
+	 setIdentity(kf.errorCovPost, Scalar::all(1));
 	
 	// initialize state vector with bounding box in [cx,cy,s,r] style
 	kf.statePost.at<float>(0, 0) = stateMat.x + stateMat.width / 2;
@@ -44,6 +44,7 @@ StateType KalmanTracker::predict()
 {
 	// predict
 	Mat p = kf.predict();
+	//Mat p = kf.statePost;
 	m_age += 1;
 
 	if (m_time_since_update > 0)
@@ -66,11 +67,14 @@ void KalmanTracker::update(StateType stateMat)
 	m_hit_streak += 1;
 
 	// measurement
-	measurement.at<float>(0, 0) = stateMat.x + stateMat.width / 2;
-	measurement.at<float>(1, 0) = stateMat.y + stateMat.height / 2;
-	measurement.at<float>(2, 0) = stateMat.area();
-	measurement.at<float>(3, 0) = stateMat.width / stateMat.height;
-
+	 measurement.at<float>(0, 0) = stateMat.x + stateMat.width / 2;
+	 measurement.at<float>(1, 0) = stateMat.y + stateMat.height / 2;
+	 measurement.at<float>(2, 0) = stateMat.area();
+	 measurement.at<float>(3, 0) = stateMat.width / stateMat.height;
+	//kf.statePost.at<float>(0, 0) = stateMat.x + stateMat.width / 2;
+	//kf.statePost.at<float>(1, 0) = stateMat.y + stateMat.height / 2;
+	//kf.statePost.at<float>(2, 0) = stateMat.area();
+	//kf.statePost.at<float>(3, 0) = stateMat.width / stateMat.height;
 	// update
 	kf.correct(measurement);
 }

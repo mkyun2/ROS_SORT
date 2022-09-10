@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>sort_ros</name>
+  <name>ros_sort</name>
   <version>0.0.0</version>
   <description>The sort_cpp package</description>
 
