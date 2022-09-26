@@ -61,17 +61,17 @@ bool display = false;
 //darknet_ros_msgs::BoundingBox predBox;
 //darknet_ros_msgs::BoundingBox detectBox;
 darknet_ros_msgs::BoundingBoxes tracked_bboxes;
-darknet_ros_msgs::BoundingBoxes detected_bboxes;
-darknet_ros_msgs::BoundingBoxes predicted_bboxes;
+
 cv::Mat frame;
-cv::Mat frame2;
+
 vector<TrackingBox> detData;
 int maxFrame = 1;
 // 0. randomly generate colors, only for display
 RNG rng(0xFFFFFFFF);
 Scalar_<int> randColor[CNUM];
 vector<KalmanTracker> trackers;
-int KalmanTracker::kf_count = 0; // tracking id relies on this, so we have to reset it in each seq.
+HungarianAlgorithm HungAlgo;
+//KalmanTracker::kf_count = 0; // modytracking id relies on this, so we have to reset it in each seq.
 
 void setup(){
     for (int i = 0; i < CNUM; i++)
@@ -107,7 +107,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
         tb.id = bboxes.bounding_boxes[i].id;
 		
         tb.box = Rect_<float>(Point_<float>(float(bboxes.bounding_boxes[i].xmin), float(bboxes.bounding_boxes[i].ymin)), Point_<float>(float(bboxes.bounding_boxes[i].xmax), float(bboxes.bounding_boxes[i].ymax)));
-		cv::rectangle(frame, tb.box, Scalar_<int>(0,255,0), 2, 8, 0);
+		//cv::rectangle(frame, tb.box, Scalar_<int>(0,255,0), 2, 8, 0);
 		detData.push_back(tb);
 		//cout << tb.box.x << endl;
     }
@@ -118,11 +118,11 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 
 	// 3. update across frames
 	int frame_count = 0;
-	int max_age = 1;
+	int max_age = 2;
 	int min_hits = 3;
 	double iouThreshold = 0.3;
 	//vector<KalmanTracker> trackers;
-	KalmanTracker::kf_count = 0; // tracking id relies on this, so we have to reset it in each seq.
+	//KalmanTracker::kf_count = 0; //mody tracking id relies on this, so we have to reset it in each seq.
 
 	// variables used in the for-loop
 	vector<Rect_<float>> predictedBoxes;
@@ -147,19 +147,24 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 	{
 		//ROS_INFO("current4");
 		frame_count++;
+		assignment.clear();
+		unmatchedTrajectories.clear();
+		unmatchedDetections.clear();
+		allItems.clear();
+		matchedItems.clear();
 		// I used to count running time using clock(), but found it seems to conflict with cv::cvWaitkey(),
 		// when they both exists, clock() can not get right result. Now I use cv::getTickCount() instead.
 		start_time = getTickCount();
-		ROS_INFO("trackes size: %d",trackers.size());
+		//ROS_INFO("trackes size: %d",trackers.size());
 		if (trackers.size() == 0) // the first frame met
 		{
 			// initialize kalman trackers using first detections.
 			for (unsigned int i = 0; i < detFrameData[fi].size(); i++)
 			{
 				
-				manageId.insert(KalmanTracker::kf_count);
+				//manageId.insert(KalmanTracker::kf_count); mody
 				KalmanTracker trk = KalmanTracker(detFrameData[fi][i].box);
-				ROS_INFO("m_id %d",trk.m_id);
+				//ROS_INFO("m_id %d",trk.m_id);
 				//ROS_INFO("detframedata: %d",detFrameData[fi].size());
 				
 				trackers.push_back(trk);
@@ -172,15 +177,15 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				//ROS_INFO("tb id %d ", tb.id);
 			}
 			
-			ROS_INFO("trackes size2: %d",trackers.size());
+			//ROS_INFO("trackes size2: %d",trackers.size());
 			continue;
 		}
-		ROS_INFO("trackes size3: %d",trackers.size());
-		//ROS_INFO("tb id2 ");
+		//ROS_INFO("trackes size3: %d",trackers.size());
+		ROS_INFO("tb id2 ");
 		///////////////////////////////////////
 		// 3.1. get predicted locations from existing trackers.
 		predictedBoxes.clear(); 
-		darknet_ros_msgs::BoundingBox predBox;
+		//darknet_ros_msgs::BoundingBox predBox;
 		for (auto it = trackers.begin(); it != trackers.end();)
 		{
 			//KalmanTracker::kf_count++;
@@ -193,15 +198,15 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				// boundingBox.xmax = res.box.x + res.box.width;
 				// boundingBox.ymax = res.box.y + res.box.height;
 				// tracked_bboxes.bounding_boxes.push_back(boundingBox);
-				cv::rectangle(frame, pBox,  Scalar_<int>(255,0,0), 2, 8, 0);
+				//cv::rectangle(frame, pBox,  Scalar_<int>(255,0,0), 2, 8, 0);
 				predictedBoxes.push_back(pBox);
 				
-				//ROS_INFO("tb id ");
+				ROS_INFO("tb id 2");
 				it++;
 			}
 			else
 			{
-				//ROS_INFO("tb id 2");
+				ROS_INFO("tb id 3");
 				//manageId.erase((*it).m_id);
 				it = trackers.erase(it);
 				//cerrdetFrameData
@@ -216,7 +221,7 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 
 		iouMatrix.clear();
 		iouMatrix.resize(trkNum, vector<double>(detNum, 0));
-		
+		//ROS_INFO("tb id 4");
 		for (unsigned int i = 0; i < trkNum; i++) // compute iou matrix as a distance matrix
 		{
 			for (unsigned int j = 0; j < detNum; j++)
@@ -225,20 +230,18 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				iouMatrix[i][j] = 1 - GetIOU(predictedBoxes[i], detFrameData[fi][j].box);
 			}
 		}
-
+		//ROS_INFO("tb id 5");
 		// solve the assignment problem using hungarian algorithm.
 		// the resulting assignment is [track(prediction) : detection], with len=preNum
-		HungarianAlgorithm HungAlgo;
-		assignment.clear();
+		
+		//cout<< "iou:" << iouMatrix.size() << endl;
+		//cout<< "assign:" << assignment.size() << endl;
 		HungAlgo.Solve(iouMatrix, assignment);
 		
 		// find matches, unmatched_detections and unmatched_predictions
-		unmatchedTrajectories.clear();
-		unmatchedDetections.clear();
-		allItems.clear();
-		matchedItems.clear();
-		ROS_INFO("det num: %d",detNum);
-		ROS_INFO("trk num: %d",trkNum);
+		
+		//ROS_INFO("det num: %d",detNum);
+		//ROS_INFO("trk num: %d",trkNum);
 		if (detNum > trkNum) //	there are unmatched detections
 		{
 			for (unsigned int n = 0; n < detNum; n++)
@@ -293,14 +296,16 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 		
 		for (unsigned int i = 0; i < matchedPairs.size(); i++)
 		{
-			ROS_INFO("matched pair %d",matchedPairs.size());
+			//ROS_INFO("matched pair %d",matchedPairs.size());
 			trkIdx = matchedPairs[i].x;
 			detIdx = matchedPairs[i].y;
 			trackers[trkIdx].update(detFrameData[fi][detIdx].box);
+			cv::rectangle(frame, detFrameData[fi][detIdx].box, Scalar_<int>(0,255,0), 2, 8, 0);
+			cv::rectangle(frame, predictedBoxes[trkIdx], Scalar_<int>(255,0,0), 2, 8, 0);
 			//trackers[trkIdx].m_id = trkIdx;
-			ROS_INFO("trkidx id %d",trkIdx);
-			ROS_INFO("detidx id %d",detIdx);
-			ROS_INFO("Matched m_id %d --",trackers[trkIdx].m_id);
+			//ROS_INFO("trkidx id %d",trkIdx);
+			//ROS_INFO("detidx id %d",detIdx);
+			//ROS_INFO("Matched m_id %d --",trackers[trkIdx].m_id);
 			manageId.insert(trackers[trkIdx].m_id);
 			// if((KalmanTracker::kf_count) == trackers[trkIdx].m_id)
 			// {
@@ -320,19 +325,19 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 				set<int>::iterator Iter = manageId.find(KalmanTracker::kf_count);
 				if(Iter != manageId.end())
 				{
-					ROS_INFO("find %d, %d",KalmanTracker::kf_count,(*Iter));
-					KalmanTracker::kf_count++;
+					//ROS_INFO("find %d, %d",KalmanTracker::kf_count,(*Iter));
+					//KalmanTracker::kf_count++; mody
 				}
 				else
 				{
-					ROS_INFO("not find %d, %d",KalmanTracker::kf_count,(*Iter));
+					//ROS_INFO("not find %d, %d",KalmanTracker::kf_count,(*Iter));
 					break;
 				}
 			}
 
 			manageId.insert(KalmanTracker::kf_count);
 			KalmanTracker tracker = KalmanTracker(detFrameData[fi][umd].box);
-			ROS_INFO("UM m_id %d **",tracker.m_id);
+			//ROS_INFO("UM m_id %d **",tracker.m_id);
 			
 			trackers.push_back(tracker);
 			
@@ -340,25 +345,26 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 			
 		}
 		
-		ROS_INFO("Display %d UMT : %d",display,unmatchedTrajectories.size());
-		//Delete unmatchedTrajectories 
-		for (auto it = trackers.begin(); it!=trackers.end();)
-		{
-
-				if(it != trackers.end() && (*it).m_time_since_update > max_age)
-				{
-				manageId.erase((*it).m_id);
-				trackers.erase(it);
-				it--;
-				ROS_INFO("ERASE");
-				}
-				it++;
-		}
+		
 		
 		// get trackers' output
 		detData.clear();
 		detFrameData.clear();
 		frameTrackingResult.clear();
+		ROS_INFO("Display %d UMT : %d",display,unmatchedTrajectories.size());
+		//Delete unmatchedTrajectories 
+		// for (auto it = trackers.begin(); it!=trackers.end();)
+		// {
+
+		// 		if(it != trackers.end() && (*it).m_time_since_update > max_age)
+		// 		{
+		// 		manageId.erase((*it).m_id);
+		// 		trackers.erase(it);
+		// 		it--;
+		// 		ROS_INFO("ERASE");
+		// 		}
+		// 		it++;
+		// }
 		for (auto it = trackers.begin(); it != trackers.end();)
 		{
 			//ROS_INFO("tb id ");
@@ -390,6 +396,14 @@ void SORT(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg)
 			}
 			else
 				it++;
+			if(it != trackers.end() && (*it).m_time_since_update > max_age)
+				{
+				manageId.erase((*it).m_id);
+				trackers.erase(it);
+				//it--;
+				ROS_INFO("ERASE");
+				}
+
 			// remove dead tracklet
 			//ROS_INFO("time %d",(*it).m_time_since_update);
 			//if (it != trackers.end() && (*it).m_time_since_update > max_age)

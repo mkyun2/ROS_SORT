@@ -3,8 +3,9 @@
 
 #include "KalmanTracker.h"
 #include <cmath>
-
-//int KalmanTracker::kf_count = 0;
+#include <iostream>
+using namespace std;
+int KalmanTracker::kf_count = 0;//mody
 
 
 // initialize Kalman filter
@@ -27,7 +28,7 @@ void KalmanTracker::init_kf(StateType stateMat)
 	 	0, 0, 0, 0, 0, 0, 1);
 
 	 setIdentity(kf.measurementMatrix);
-	 setIdentity(kf.processNoiseCov, Scalar::all(1e-2));
+	 setIdentity(kf.processNoiseCov, Scalar::all(1e-1));
 	 setIdentity(kf.measurementNoiseCov, Scalar::all(1e-1));
 	 setIdentity(kf.errorCovPost, Scalar::all(1));
 	
@@ -36,12 +37,17 @@ void KalmanTracker::init_kf(StateType stateMat)
 	kf.statePost.at<float>(1, 0) = stateMat.y + stateMat.height / 2;
 	kf.statePost.at<float>(2, 0) = stateMat.area();
 	kf.statePost.at<float>(3, 0) = stateMat.width / stateMat.height;
+
+	kf.errorCovPost.at<float>(4,4) = 1000;
+	kf.errorCovPost.at<float>(5,5) = 1000;
+	kf.errorCovPost.at<float>(6,6) = 1000;
 }
 
 
 // Predict the estimated bounding box.
 StateType KalmanTracker::predict()
 {
+	
 	// predict
 	Mat p = kf.predict();
 	//Mat p = kf.statePost;
@@ -52,7 +58,7 @@ StateType KalmanTracker::predict()
 	m_time_since_update += 1;
 
 	StateType predictBox = get_rect_xysr(p.at<float>(0, 0), p.at<float>(1, 0), p.at<float>(2, 0), p.at<float>(3, 0));
-
+	
 	m_history.push_back(predictBox);
 	return m_history.back();
 }
@@ -67,16 +73,23 @@ void KalmanTracker::update(StateType stateMat)
 	m_hit_streak += 1;
 
 	// measurement
-	 measurement.at<float>(0, 0) = stateMat.x + stateMat.width / 2;
-	 measurement.at<float>(1, 0) = stateMat.y + stateMat.height / 2;
-	 measurement.at<float>(2, 0) = stateMat.area();
-	 measurement.at<float>(3, 0) = stateMat.width / stateMat.height;
+	measurement.at<float>(0, 0) = stateMat.x + stateMat.width / 2;
+	measurement.at<float>(1, 0) = stateMat.y + stateMat.height / 2;
+	measurement.at<float>(2, 0) = stateMat.area();
+	measurement.at<float>(3, 0) = stateMat.width / stateMat.height;
 	//kf.statePost.at<float>(0, 0) = stateMat.x + stateMat.width / 2;
 	//kf.statePost.at<float>(1, 0) = stateMat.y + stateMat.height / 2;
 	//kf.statePost.at<float>(2, 0) = stateMat.area();
 	//kf.statePost.at<float>(3, 0) = stateMat.width / stateMat.height;
 	// update
+	//cout << "state: " << kf.statePost << endl;
+	cout << "processNoise: " << kf.processNoiseCov << endl;
+	cout << "errorCovPost: " << kf.errorCovPost << endl;
+	cout << "MeasurementNoise: " << kf.measurementNoiseCov << endl;
+	//cout << "Measurement: " << measurement << endl;
 	kf.correct(measurement);
+	//cout << "UpdateErrCov: " << kf.errorCovPost << endl;
+	//cout << "UpdateState: " << kf.statePost << endl;
 }
 
 
